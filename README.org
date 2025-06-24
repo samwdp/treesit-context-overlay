@@ -1,0 +1,18 @@
+#+title: Treesitter Overlays
+
+* Introduction
+This is an emacs mode that is designed to be similar to [[https://github.com/andersevenrud/nvim_context_vt][nvim_context_vt]]
+
+This will display an overlay at the end of most scopes to siginfy where you are in your file.
+
+* Requirements
+Emacs >= 29 with --with-tree-sitter compliation option.
+
+* Installation
+#+begin_src emacs-lisp
+  (use-package treesit-context-overlay
+    :straight (treesit-context-overlay :fetcher github :repo "samwdp/treesit-context-overlay"
+    )
+#+end_src
+
+Then in any *-ts-mode M-x treesit-context-overlay-mode
