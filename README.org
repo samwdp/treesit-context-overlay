@@ -32,7 +32,9 @@ Then in any *-ts-mode M-x treesit-context-overlay-mode
 |                                   |                         | string | (setq treesit-context-overlay-face "#ff6600")                          |
 |                                   |                         | plist  | (setq treesit-context-overlay-face '(:foreground "blue" :weight bold)) |
 |-----------------------------------+-------------------------+--------+------------------------------------------------------------------------|
-For the font lock faces press ==M-x== describe-variable and search for font-lock face. This will show you all the faces you have and what their properties are.
+
+For the font lock faces press ~M-x~ describe-variable and search for font-lock face. This will show you all the faces you have and what their properties are.
+
 * Languages tested
 typescript-ts-mode
 csharp-ts-mode
