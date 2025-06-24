@@ -23,6 +23,7 @@
 ;; along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
 (require 'treesit)
+(require 'seq)
 
 (defgroup treesit-context-overlay nil
   "Show overlays at ending of containing scopes using Tree-sitter."
@@ -49,7 +50,7 @@
     "variable_declaration" "lexical_declaration" "variable_statement"
     "statement_block" "block"
     "namespace_declaration")
-  "Tree-sitter node types considered as code scopes (including loops, try/catch, blocks, and namespace declarations).")
+  "Tree-sitter node types considered as code scopes.")
 
 (defun treesit-context-overlay--clear-overlays ()
   "Remove all treesit-context-overlay overlays."
@@ -62,7 +63,6 @@
   (when node
     (let ((type (treesit-node-type node)))
       (cond
-       ;; Statements with condition/parameters
        ((member type '("if_statement" "while_statement" "for_statement" "for_in_statement" "for_of_statement" "do_statement"))
         (let* ((kw (cond
                     ((string= type "if_statement")
@@ -77,7 +77,6 @@
                     (t type)))
                (header
                 (cond
-                 ;; for loops: reconstruct full header
                  ((string= type "for_statement")
                   (let ((init (treesit-node-child-by-field-name node "initializer"))
                         (condn (treesit-node-child-by-field-name node "condition"))
@@ -88,7 +87,6 @@
                      (when condn (concat (if init "; " "") (string-trim (treesit-node-text condn))))
                      (when upd (concat "; " (string-trim (treesit-node-text upd))))
                      ")")))
-                 ;; for-in/of: left and right
                  ((or (string= type "for_in_statement") (string= type "for_of_statement"))
                   (let ((left (treesit-node-child-by-field-name node "left"))
                         (right (treesit-node-child-by-field-name node "right")))
@@ -96,17 +94,14 @@
                             (when left (string-trim (treesit-node-text left)))
                             (if right (concat " in " (string-trim (treesit-node-text right))) "")
                             ")")))
-                 ;; if, while, do while: use condition
                  (t
                   (let ((cond-node (treesit-node-child-by-field-name node "condition")))
                     (if cond-node
                         (concat kw " (" (string-trim (treesit-node-text cond-node)) ")")
                       kw))))))
           header))
-       ;; else: handled as alternative field of if_statement, or as else_clause
        ((string= type "else_clause")
         "else")
-       ;; function/class/object/namespace: use name or key if available
        ((member type '("function_declaration" "function" "method_definition"
                        "arrow_function" "generator_function" "function_expression"
                        "class_declaration" "class"
@@ -114,20 +109,42 @@
                        "namespace_declaration"))
         (let ((name-node (or (treesit-node-child-by-field-name node "name")
                              (treesit-node-child-by-field-name node "key"))))
-          (when name-node (string-trim (treesit-node-text name-node)))))
-       ;; try/catch/finally: show keyword
-       ((member type '("try_statement" "catch_clause" "finally_clause"))
-        (replace-regexp-in-string "_" " " (replace-regexp-in-string "_statement\\|_clause$" "" type)))
-       ;; variable/lexical declarations (let/const/var)
-       ((member type '("variable_declaration" "lexical_declaration" "variable_statement"))
-        (let ((name-node (treesit-node-child-by-field-name node "name")))
           (if name-node
               (string-trim (treesit-node-text name-node))
+            (pcase type
+              ("arrow_function" "() => ...")
+              ("function_expression" "function")
+              ("generator_function" "function*")
+              ("method_definition" "method")
+              ("class" "class")
+              ("class_declaration" "class")
+              ("object" "object")
+              ("object_literal" "object")
+              ("object_pattern" "object")
+              ("namespace_declaration" "namespace")
+              (_ type)))))
+       ((member type '("try_statement" "catch_clause" "finally_clause"))
+        (replace-regexp-in-string "_" " " (replace-regexp-in-string "_statement\\|_clause$" "" type)))
+       ((member type '("variable_declaration" "lexical_declaration" "variable_statement"))
+        (let* ((names
+                (delq nil
+                      (mapcar
+                       (lambda (child)
+                         (cond
+                          ((member (treesit-node-type child)
+                                   '("variable_declarator" "variable_declarator_pattern"))
+                           (let ((name-node (treesit-node-child-by-field-name child "name")))
+                             (when name-node (string-trim (treesit-node-text name-node)))))
+                          ((string= (treesit-node-type child) "identifier")
+                           (string-trim (treesit-node-text child)))
+                          (t nil)))
+                       (treesit-node-children node)))))
+          (if (and names (> (length names) 0))
+              (string-join names ", ")
             (pcase type
               ("variable_declaration" "var")
               ("lexical_declaration" "let/const")
               (_ "var/let/const")))))
-       ;; statement_block or block: use parent node's keyword if available
        ((member type '("statement_block" "block"))
         (let* ((parent (treesit-node-parent node))
                (parent-type (when parent (treesit-node-type parent))))
@@ -141,7 +158,20 @@
                                   "arrow_function" "generator_function" "function_expression"))
             (let ((name-node (or (treesit-node-child-by-field-name parent "name")
                                  (treesit-node-child-by-field-name parent "key"))))
-              (when name-node (string-trim (treesit-node-text name-node)))))
+              (if name-node
+                  (string-trim (treesit-node-text name-node))
+                (pcase parent-type
+                  ("arrow_function" "() => ...")
+                  ("function_expression" "function")
+                  ("generator_function" "function*")
+                  ("method_definition" "method")
+                  ("class" "class")
+                  ("class_declaration" "class")
+                  ("object" "object")
+                  ("object_literal" "object")
+                  ("object_pattern" "object")
+                  ("namespace_declaration" "namespace")
+                  (_ parent-type)))))
            ((member parent-type '("class_declaration" "class"))
             (let ((name-node (treesit-node-child-by-field-name parent "name")))
               (when name-node (string-trim (treesit-node-text name-node)))))
@@ -167,6 +197,24 @@
   (when (and name (not (string-empty-p name)))
     (format " %s %s" treesit-context-overlay-delimiter name)))
 
+(defun treesit-context-overlay--function-overlay-end (node)
+  "Return the end position after the outermost call/expression/statement for a function NODE.
+This function aggressively walks up the parent tree to find the true statement end."
+  (let ((best-end (treesit-node-end node))
+        (current node))
+    ;; Walk up the parent chain until we can't find a parent that extends beyond our current best
+    (while current
+      (let ((parent (treesit-node-parent current)))
+        (if (and parent
+                 (> (treesit-node-end parent) best-end)
+                 ;; Stop at certain boundary nodes that indicate we've gone too far
+                 (not (member (treesit-node-type parent) '("program" "source_file" "translation_unit"))))
+            (progn
+              (setq best-end (treesit-node-end parent))
+              (setq current parent))
+          (setq current nil))))
+    best-end))
+
 (defun treesit-context-overlay--add-overlays ()
   "Add overlays at the end of all containing scopes at point."
   (treesit-context-overlay--clear-overlays)
@@ -180,19 +228,43 @@
            (ends-seen '()))
       (dolist (pt pts)
         (dolist (scope (treesit-context-overlay--enclosing-scope-nodes pt))
-          (let* ((end (treesit-node-end scope))
+          (let* ((type (treesit-node-type scope))
+                 (is-func (member type '("arrow_function" "function_expression" "generator_function" "function" "function_declaration" "method_definition")))
+                 (node-end (treesit-node-end scope))
+                 (overlay-end (if is-func
+                                  (treesit-context-overlay--function-overlay-end scope)
+                                node-end))
+                 (parent (treesit-node-parent scope))
+                 (parent-type (when parent (treesit-node-type parent)))
                  (name (treesit-context-overlay--get-scope-name scope))
-                 (display (treesit-context-overlay--format-display name)))
-            ;; Only show one overlay per scope end, and only if point is within the scope.
-            (when (and (not (memq end ends-seen))
+                 (display (treesit-context-overlay--format-display name))
+                 (skip-overlay
+                  (cond
+                   ;; Skip overlays at end of any block/statement_block whose parent is an if_statement with alternative
+                   ((and (member type '("block" "statement_block"))
+                         parent
+                         (string= parent-type "if_statement")
+                         (treesit-node-child-by-field-name parent "alternative"))
+                    t)
+                   ;; For if_statement, only insert overlay at its own node end
+                   ((string= type "if_statement")
+                    (not (= overlay-end node-end)))
+                   ;; For functions: if the overlay-end is different from node-end,
+                   ;; only add the overlay at the outermost position, not at the function's own end
+                   ((and is-func (not (= overlay-end node-end)))
+                    ;; Skip this overlay - we only want it at the outermost expression end
+                    t)
+                   (t nil))))
+            (when (and (not skip-overlay)
+                       (not (memq overlay-end ends-seen))
                        (<= (treesit-node-start scope) pt)
-                       (< pt (treesit-node-end scope)))
+                       (< pt node-end))
               (when display
-                (let ((ov (make-overlay end end)))
+                (let ((ov (make-overlay overlay-end overlay-end)))
                   (overlay-put ov 'after-string
                                (propertize display 'face 'font-lock-comment-face))
                   (push ov treesit-context-overlay--overlays)
-                  (push end ends-seen))))))))))
+                  (push overlay-end ends-seen))))))))))
 
 (defun treesit-context-overlay--post-command-hook ()
   (condition-case err
