@@ -7,7 +7,6 @@
 ;; Homepage: https://github.com/samwdp/treesit-context-overlay
 ;; Keywords: Package Emacs
 
-
 ;; This file is not part of GNU Emacs
 
 ;; This program is free software: you can redistribute it and/or modify
@@ -24,6 +23,16 @@
 ;; along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
 (require 'treesit)
+
+(defgroup treesit-context-overlay nil
+  "Show overlays at ending of containing scopes using Tree-sitter."
+  :group 'convenience
+  :prefix "treesit-context-overlay-")
+
+(defcustom treesit-context-overlay-delimiter "==>"
+  "String prepended to the overlay display text, before the context label."
+  :type 'string
+  :group 'treesit-context-overlay)
 
 (defvar-local treesit-context-overlay--overlays nil
   "List of overlays displaying context at scope endings.")
@@ -49,7 +58,7 @@
     (setq treesit-context-overlay--overlays nil)))
 
 (defun treesit-context-overlay--get-scope-name (node)
-  "Get a display name for NODE."
+  "Get a context name for NODE. Does not include delimiter."
   (when node
     (let ((type (treesit-node-type node)))
       (cond
@@ -93,10 +102,10 @@
                     (if cond-node
                         (concat kw " (" (string-trim (treesit-node-text cond-node)) ")")
                       kw))))))
-          (concat "==> " header)))
+          header))
        ;; else: handled as alternative field of if_statement, or as else_clause
        ((string= type "else_clause")
-        "==> else")
+        "else")
        ;; function/class/object/namespace: use name or key if available
        ((member type '("function_declaration" "function" "method_definition"
                        "arrow_function" "generator_function" "function_expression"
@@ -153,6 +162,11 @@
       (setq node (treesit-node-parent node)))
     (nreverse nodes)))
 
+(defun treesit-context-overlay--format-display (name)
+  "Format overlay display string with delimiter prepended to NAME."
+  (when (and name (not (string-empty-p name)))
+    (format " %s %s" treesit-context-overlay-delimiter name)))
+
 (defun treesit-context-overlay--add-overlays ()
   "Add overlays at the end of all containing scopes at point."
   (treesit-context-overlay--clear-overlays)
@@ -168,8 +182,7 @@
         (dolist (scope (treesit-context-overlay--enclosing-scope-nodes pt))
           (let* ((end (treesit-node-end scope))
                  (name (treesit-context-overlay--get-scope-name scope))
-                 (display (when (and name (not (string-empty-p name)))
-                            (format " %s" name))))
+                 (display (treesit-context-overlay--format-display name)))
             ;; Only show one overlay per scope end, and only if point is within the scope.
             (when (and (not (memq end ends-seen))
                        (<= (treesit-node-start scope) pt)
