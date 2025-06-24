@@ -27,6 +27,6 @@ Then in any *-ts-mode M-x treesit-context-overlay-mode
 typescript-ts-mode
 csharp-ts-mode
 
-* Next stages
-*** TODO Go through and get all node types that should have something to does
-*** TODO Test on different languages
+* TODO Next stages
+  - [ ] Go through and get all node types that should have something to does
+  - [ ] Test on different languages
