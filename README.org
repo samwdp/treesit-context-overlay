@@ -9,10 +9,10 @@ This will display an overlay at the end of most scopes to siginfy where you are 
 Emacs >= 29 with --with-tree-sitter compliation option.
 
 * Installation
+** Straight
 #+begin_src emacs-lisp
   (use-package treesit-context-overlay
-    :straight (treesit-context-overlay :fetcher github :repo "samwdp/treesit-context-overlay"
-    )
+    :straight (treesit-context-overlay :host github :repo "samwdp/treesit-context-overlay"))
 #+end_src
 
 Then in any *-ts-mode M-x treesit-context-overlay-mode
