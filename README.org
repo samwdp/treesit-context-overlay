@@ -16,3 +16,7 @@ Emacs >= 29 with --with-tree-sitter compliation option.
 #+end_src
 
 Then in any *-ts-mode M-x treesit-context-overlay-mode
+
+* Languages tested
+typescript-ts-mode
+csharp-ts-mode
