@@ -12,17 +12,27 @@ Emacs >= 29 with --with-tree-sitter compliation option.
 ** Straight
 #+begin_src emacs-lisp
   (use-package treesit-context-overlay
-    :straight (treesit-context-overlay :host github :repo "samwdp/treesit-context-overlay"))
+    :straight (treesit-context-overlay :host github :repo "samwdp/treesit-context-overlay")
+    :hook (csharp-ts-mode . treesit-context-overlay-mode)
+    :config
+    ;; these are the default values but feel free to set them to something different. Use the table below for the configuration
+    (setq treesit-context-overlay-delimiter "==>"
+          treesit-context-overlay-face 'font-lock-comment-face))
 #+end_src
 
 Then in any *-ts-mode M-x treesit-context-overlay-mode
 
 * Configuration
-| Variable                          | Initial Value | Type   | Modification                                   |
-|-----------------------------------+---------------+--------+------------------------------------------------|
-| treesit-context-overlay-delimiter | "==>"         | string | (setq treesit-context-overlay-delimiter "-->") |
-
-
+|-----------------------------------+-------------------------+--------+------------------------------------------------------------------------|
+| Variable                          | Initial Value           | Type   | Modification                                                           |
+|-----------------------------------+-------------------------+--------+------------------------------------------------------------------------|
+| treesit-context-overlay-delimiter | "==>"                   | string | (setq treesit-context-overlay-delimiter "-->")                         |
+| treesit-context-overlay-face      | 'font-lock-comment-face | face   | (setq treesit-context-overlay-face 'font-lock-string-face)             |
+|                                   |                         | string | (setq treesit-context-overlay-face "red")                              |
+|                                   |                         | string | (setq treesit-context-overlay-face "#ff6600")                          |
+|                                   |                         | plist  | (setq treesit-context-overlay-face '(:foreground "blue" :weight bold)) |
+|-----------------------------------+-------------------------+--------+------------------------------------------------------------------------|
+For the font lock faces press ==M-x== describe-variable and search for font-lock face. This will show you all the faces you have and what their properties are.
 * Languages tested
 typescript-ts-mode
 csharp-ts-mode
