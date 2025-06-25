@@ -56,7 +56,7 @@ or a face specification (plist with :foreground, :background, etc.)."
     "while_statement" "do_statement"
     "try_statement" "catch_clause" "finally_clause"
     "variable_declaration" "lexical_declaration" "variable_statement"
-    "statement_block" "block"
+    "statement_block" "block" "method_declaration" "local_function_statement"
     "namespace_declaration")
   "Tree-sitter node types considered as code scopes (including loops, try/catch, blocks, and namespace declarations).")
 
@@ -134,7 +134,8 @@ FACE-SPEC can be a face name, color string, or face specification."
        ;; function/class/object/namespace: use name or key if available
        ((member type '("function_declaration" "function" "method_definition"
                        "arrow_function" "generator_function" "function_expression"
-                       "class_declaration" "class"
+                       "local_function_statement"
+                       "class_declaration" "class" "method_declaration"
                        "object" "object_literal" "object_pattern"
                        "namespace_declaration"))
         (let ((name-node (or (treesit-node-child-by-field-name node "name")
@@ -162,7 +163,8 @@ FACE-SPEC can be a face name, color string, or face specification."
             (treesit-context-overlay--get-scope-name parent))
            ((member parent-type '("try_statement" "catch_clause" "finally_clause"))
             (replace-regexp-in-string "_" " " (replace-regexp-in-string "_statement\\|_clause$" "" parent-type)))
-           ((member parent-type '("function_declaration" "function" "method_definition"
+           ((member parent-type '("function_declaration" "function" "method_definition" "method_declaration"
+                                  "local_function_statement"
                                   "arrow_function" "generator_function" "function_expression"))
             (let ((name-node (or (treesit-node-child-by-field-name parent "name")
                                  (treesit-node-child-by-field-name parent "key"))))
