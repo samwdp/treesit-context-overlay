@@ -82,6 +82,18 @@ FACE-SPEC can be a face name, color string, or face specification."
    ;; Fallback to comment face
    (t 'font-lock-comment-face)))
 
+(defun treesit-context-overlay--get-variable-names (node)
+  "Extract variable names from a variable declaration NODE."
+  (let ((declarators '())
+        (child (treesit-node-child node 0)))
+    (while child
+      (when (string= (treesit-node-type child) "variable_declarator")
+        (let ((name-node (treesit-node-child-by-field-name child "name")))
+          (when name-node
+            (push (string-trim (treesit-node-text name-node)) declarators))))
+      (setq child (treesit-node-next-sibling child)))
+    (nreverse declarators)))
+
 (defun treesit-context-overlay--get-scope-name (node)
   "Get a context name for NODE. Does not include delimiter."
   (when node
@@ -144,11 +156,11 @@ FACE-SPEC can be a face name, color string, or face specification."
        ;; try/catch/finally: show keyword
        ((member type '("try_statement" "catch_clause" "finally_clause"))
         (replace-regexp-in-string "_" " " (replace-regexp-in-string "_statement\\|_clause$" "" type)))
-       ;; variable/lexical declarations (let/const/var)
+       ;; variable/lexical declarations: extract variable names
        ((member type '("variable_declaration" "lexical_declaration" "variable_statement"))
-        (let ((name-node (treesit-node-child-by-field-name node "name")))
-          (if name-node
-              (string-trim (treesit-node-text name-node))
+        (let ((var-names (treesit-context-overlay--get-variable-names node)))
+          (if var-names
+              (string-join var-names ", ")
             (pcase type
               ("variable_declaration" "var")
               ("lexical_declaration" "let/const")
